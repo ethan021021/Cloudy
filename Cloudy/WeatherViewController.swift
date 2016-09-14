@@ -101,7 +101,7 @@ extension WeatherViewController: UITableViewDelegate, UITableViewDataSource, CLL
                 }
             } else {
                 locationManager.requestWhenInUseAuthorization()
-                locationAuthStatus()
+                locationManager(manager, didUpdateLocations: locations)
             }
         }
     }
