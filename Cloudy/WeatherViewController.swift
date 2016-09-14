@@ -31,23 +31,24 @@ class WeatherViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.requestWhenInUseAuthorization()
-        locationManager.startUpdatingLocation()
         weatherTableView.delegate = self
         weatherTableView.dataSource = self
         // Do any additional setup after loading the view, typically from a nib.
         currentWeather = CurrentWeather()
     }
     
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        locationAuthStatus()
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .lightContent
     }
     
-    func locationAuthStatus() {
+    override func viewWillAppear(_ animated: Bool) {
+        locationManager.requestWhenInUseAuthorization()
         
+        if CLLocationManager.locationServicesEnabled() {
+            locationManager.delegate = self
+            locationManager.desiredAccuracy = kCLLocationAccuracyBest
+            locationManager.startUpdatingLocation()
+        }
     }
     
     func downloadForecastData(completed: @escaping DownloadComplete) {
@@ -83,27 +84,42 @@ class WeatherViewController: UIViewController {
         locationLabel.text = currentWeather.cityName
         currentWeatherImageView.image = UIImage(named: currentWeather.weatherType)
     }
+    
+    func showBasicAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Ok", style: .default, handler: nil))
+        present(alert, animated: true, completion: nil)
+    }
 }
 
 extension WeatherViewController: UITableViewDelegate, UITableViewDataSource, CLLocationManagerDelegate {
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        if let currentLoc = locations.first {
-            if CLLocationManager.authorizationStatus() == .authorizedWhenInUse {
-                currentLocation = currentLoc
-                locationManager.stopUpdatingLocation()
-                Location.sharedInstance.latitude = currentLocation.coordinate.latitude
-                Location.sharedInstance.longitude = currentLocation.coordinate.longitude
-                currentWeather.downloadWeatherDetails {
-                    self.downloadForecastData {
-                        self.updateMainUI()
-                    }
+        if let location = manager.location {
+            currentLocation = location
+            Location.sharedInstance.latitude = currentLocation.coordinate.latitude
+            Location.sharedInstance.longitude = currentLocation.coordinate.longitude
+            locationManager.stopUpdatingLocation()
+            currentWeather.downloadWeatherDetails {
+                self.downloadForecastData {
+                    self.updateMainUI()
                 }
-            } else {
-                locationManager.requestWhenInUseAuthorization()
-                locationManager(manager, didUpdateLocations: locations)
             }
         }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        switch status {
+        case .authorizedWhenInUse:
+            manager.startUpdatingLocation()
+        case .denied:
+            showBasicAlert(title: "Error!", message: "Please enable location settings for this application in Settings -> Privacy -> Cloudy")
+        default: break
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        showBasicAlert(title: "Error!", message: "Location services disabled.")
     }
     
     func numberOfSections(in tableView: UITableView) -> Int {
